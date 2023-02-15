@@ -21,17 +21,4 @@ python oceantracker/setup.py develop
 conda config --add channels conda-forge
 conda env create -f opendrift/environment.yml
 conda activate opendrift
-pip install --no-deps -e .
-
-
-# running the performance test 
-conda activate opendrift
-python ot_od_performance.py --model opendrift
-conda deactivate
-
-conda activate oceantracker
-python ot_od_performance.py --model oceantracker
-conda deactivate
-
-
-
+pip install --no-deps -e ./opendrift
