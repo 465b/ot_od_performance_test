@@ -23,7 +23,7 @@ cmd_parser = argparse.ArgumentParser(description='Run a test of the performance 
 cmd_parser.add_argument('--model', type=str, default='oceantracker', help='Which model to run. Options are "opendrift" and "oceantracker".')
 which_model = cmd_parser.parse_args().model
 
-name_of_run = 'schism_test_v02'
+name_of_run = 'schism_test_v03'
 description_of_run = ''
 
 # input description
@@ -82,7 +82,7 @@ release_points = np.array([
        ]) # lon, lat
 
 release_points_schism = transformer.transform(release_points[:,0], release_points[:,1])
-pulse_size = np.logspace(3,7,9,dtype=int)
+pulse_size = np.logspace(3,6,4,dtype=int)
 
 max_model_duration = 1 # days
 # care:
@@ -134,7 +134,7 @@ if which_model=='oceantracker':
                     # "model_timestep": 1800.0,
                     "n_sub_steps": int(1800/model_time_step),
                     "RK_order": RK_order,
-                    "screen_output_step_count": 10,
+                    "screen_output_step_count": int(2*1800/model_time_step), # every hour
                 },
                 "particle_release_groups": [
                     {
@@ -232,8 +232,8 @@ if which_model == 'opendrift':
         #%%
         #%timeit
         o.run(end_time=schism_native.start_time + timedelta(days=max_model_duration), 
-            time_step=900)
-            #outfile=os.path.join(path_to_output,name_of_run+'od.nc'))
+            time_step=model_time_step)
+            # outfile=os.path.join(path_to_output,name_of_run+'_od.nc'))
         
         with open(os.path.join(path_to_output,name_of_run+'.txt'), 'a') as f:
             f.write(f"{which_model},{pulse},{o.timing['total time'].total_seconds()}\n")
