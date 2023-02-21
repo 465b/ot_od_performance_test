@@ -140,56 +140,56 @@ input_datasets['rom'] = {
         proj.CRS.from_epsg(32619), # UTM19N
         always_xy=True),
     'release_points_lon_lat': np.array([
+        # [-78.06824664,  38.41109756], # outside domain
+        # [-77.48956078,  35.87834191], # outside domain
+        # [-76.9632904 ,  39.24838291], # outside domain
+        # [-76.45835255,  35.68510219], # outside domain
+        [-75.51165512,  38.31082864],
+        [-74.8860462 ,  35.44369297],
+        [-74.52862058,  34.2950443 ],
+        [-74.21067673,  34.67342632],
+        [-73.95323861,  35.41533207],
+        [-73.46990185,  35.73379049],
+        [-73.18779878,  39.79203454],
+        [-72.84653146,  38.95630874],
         [-72.63457538,  36.91732252],
         [-72.59191209,  40.63632652],
-        [-75.51165512,  38.31082864],
+        [-72.19871125,  35.34782645],
+        [-71.16154411,  36.63844384],
+        # [-71.15314662,  42.11431184],
+        # [-70.46635119,  43.52036114],
         [-70.09004307,  38.54977471],
+        [-69.9444851 ,  38.71378714],
+        [-69.84821837,  42.92174757],
+        [-69.80693744,  40.67720343],
         [-68.10444023,  41.69506538],
         [-67.62495283,  41.95124591],
-        [-73.95323861,  35.41533207],
-        [-73.18779878,  39.79203454],
-        [-74.8860462 ,  35.44369297],
-        [-60.99873369,  42.50516744],
-        [-70.46635119,  43.52036114],
-        [-72.19871125,  35.34782645],
-        [-64.79557692,  42.78925352],
-        [-69.80693744,  40.67720343],
-        [-71.16154411,  36.63844384],
-        [-63.04835776,  43.70211662],
-        [-74.52862058,  34.2950443 ],
         [-67.08252378,  38.31765205],
-        [-63.43641926,  41.95324376],
         [-66.85770073,  42.88834616],
-        [-69.9444851 ,  38.71378714],
-        [-65.31633613,  45.24194   ],
-        [-74.21067673,  34.67342632],
-        [-76.45835255,  35.68510219],
-        [-76.9632904 ,  39.24838291],
-        [-78.06824664,  38.41109756],
-        [-62.37610229,  41.41986588],
-        [-61.12644699,  42.29980774],
-        [-64.26535265,  39.81402787],
-        [-61.84710945,  43.14830997],
         [-65.48411736,  42.97607939],
+        [-65.31633613,  45.24194   ],
+        [-64.79557692,  42.78925352],
         [-64.51109065,  43.15402752],
-        [-69.84821837,  42.92174757],
-        [-71.15314662,  42.11431184],
-        [-63.5384388 ,  44.58749064],
-        [-77.48956078,  35.87834191],
-        [-72.84653146,  38.95630874],
-        [-73.46990185,  35.73379049]
-    ])
+        [-64.26535265,  39.81402787],
+        # [-63.5384388 ,  44.58749064],
+        [-63.43641926,  41.95324376],
+        [-63.04835776,  43.70211662],
+        [-62.37610229,  41.41986588],
+        [-61.84710945,  43.14830997],
+        [-61.12644699,  42.29980774],
+        [-60.99873369,  42.50516744]
+        ])
 
 }
 
 # output description
 path_to_output =  os.path.join('C:\\Users\\laurins\\Documents\\data\\output',name_of_run)
 os.makedirs(path_to_output, exist_ok=True)
-output_step_size = 3600 # in sec, 0 means no output
+output_step_size = 0 # in sec, 0 means no output
 
 # model description (solver, release, etc.name_of_run)
 
-pulse_size = np.logspace(3,4,2,dtype=int)
+pulse_size = np.logspace(3,5,3,dtype=int)
 
 max_model_duration = 2 # days
 # care:
@@ -300,7 +300,7 @@ for pulse in pulse_size:
         from opendrift.models.sedimentdrift import SedimentDrift
         from datetime import timedelta
 
-        o = SedimentDrift(loglevel=80)  # Set loglevel to 0 for debug information
+        o = SedimentDrift(loglevel=40)  # Set loglevel to 0 for debug information
 
 
         if 'schism' in which_dataset:
@@ -347,7 +347,7 @@ for pulse in pulse_size:
 
         o.run(end_time=dataset_start_time + timedelta(days=max_model_duration), 
             time_step=model_time_step,
-            time_step_output=output_step_size if output_step_size != 0 else max_model_duration*24*60*60+1,
+            time_step_output=output_step_size if output_step_size != 0 else max_model_duration*24*60*60,
             outfile=os.path.join(
                 path_to_output,
                 name_of_run+'_'+which_dataset+'_' + str(pulse) + '_od',
