@@ -3,6 +3,7 @@ import argparse
 import pyproj as proj
 import numpy as np
 import os
+import pickle
 
 '''
 Here we compare the speed of OpenDrift with the speed of oceantracker03.
@@ -22,7 +23,7 @@ cmd_parser.add_argument('--dataset', type=str, default='rom', help='Which datase
 which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
 
-name_of_run = 'full_dataset_test_v00'
+name_of_run = 'full_dataset_test_v01'
 description_of_run = ''
 
 # input dictionary
@@ -230,7 +231,8 @@ for pulse in pulse_size:
                     "write_tracks": False if output_step_size==0 else True,
                 },
                 "dispersion": {
-                    "A_H": 0.1
+                    "A_H": 0.1,
+                    "A_V": 0.01
                 },
                 "tracks_writer": {
                     "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
@@ -300,7 +302,7 @@ for pulse in pulse_size:
         from opendrift.models.sedimentdrift import SedimentDrift
         from datetime import timedelta
 
-        o = SedimentDrift(loglevel=40)  # Set loglevel to 0 for debug information
+        o = SedimentDrift(loglevel=100)  # Set loglevel to 0 for debug information
 
 
         if 'schism' in which_dataset:
@@ -308,7 +310,10 @@ for pulse in pulse_size:
             # NZTM proj4 string found at https://spatialreference.org/ref/epsg/nzgd2000-new-zealand-transverse-mercator-2000/
             proj4str_nztm = '+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
             schism_native = reader_schism_native.Reader(
-                    filename = os.path.join(input_datasets[which_dataset]['path_to_hindcast'],input_datasets[which_dataset]['file_mask']),
+                filename = os.path.join(
+                    input_datasets[which_dataset]['path_to_hindcast'],
+                    input_datasets[which_dataset]['file_mask']
+                    ),
                 proj4 = proj4str_nztm,
                 use_3d = True)
             o.add_reader([reader_landmask,schism_native])
@@ -316,7 +321,10 @@ for pulse in pulse_size:
             dataset_start_time = schism_native.start_time
         else: 
             roms_reader = reader_ROMS_native.Reader(
-                filename = os.path.join(input_datasets[which_dataset]['path_to_hindcast'],input_datasets[which_dataset]['file_mask']),
+                filename = os.path.join(
+                    input_datasets[which_dataset]['path_to_hindcast'],
+                    input_datasets[which_dataset]['file_mask']
+                    )
             )
             o.add_reader(roms_reader)
             dataset_start_time = roms_reader.start_time
@@ -330,20 +338,38 @@ for pulse in pulse_size:
         else:
             print('Error: RK_order must be 1 or 4')
             break   
+        
+        # stokes drift
+        o.set_config('drift:stokes_drift', False)
+
+        # horizontal mixing
         o.set_config('drift:horizontal_diffusivity',0.1) 
-        o.set_config('vertical_mixing:resuspension_threshold', critical_resuspension_vel)
+
+        # vertical mixing      
+        # the constant one (which would be the fairest) would require some hacking
+        # to define an approriate environment in all cases to get it to work
+        # hence we use the default non-constant one. 
+        # the comp cost are not expected to be significant
+        # o.set_config('vertical_mixing:diffusivitymodel', 'constant')
+        # o.set_config('environment:fallback:ocean_vertical_diffusivity', 0.01)
         o.set_config('vertical_mixing:diffusivitymodel', 'windspeed_Large1994')
+
+        # resuspension
+        o.set_config('vertical_mixing:resuspension_threshold', critical_resuspension_vel)
+
 
 
         # Seed elements at defined positions, depth and time
         for point in input_datasets[which_dataset]['release_points_lon_lat']:
             o.seed_elements(lon=point[0], lat=point[1], radius=0,
-                        number=int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
-                        z=0,
-                        time=dataset_start_time)
+                number=int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
+                z=0,time=dataset_start_time)
 
 
-        os.makedirs(os.path.join(path_to_output,name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od'), exist_ok=True)
+        os.makedirs(os.path.join(
+            path_to_output,name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od'),
+            exist_ok=True
+            )
 
         o.run(end_time=dataset_start_time + timedelta(days=max_model_duration), 
             time_step=model_time_step,
@@ -353,6 +379,12 @@ for pulse in pulse_size:
                 name_of_run+'_'+which_dataset+'_' + str(pulse) + '_od',
                 'tracks.nc')
             )
+
+        with open(os.path.join(
+            path_to_output,
+            name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od',
+            name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od'+'.pkl'), 'wb') as f:
+            pickle.dump(o.timing, f)
 
         total_time = o.timing['total time'].total_seconds()
 
