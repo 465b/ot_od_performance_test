@@ -23,8 +23,7 @@ cmd_parser.add_argument('--dataset', type=str, default='rom', help='Which datase
 which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
 
-name_of_run = 'full_dataset_test_v01'
-description_of_run = ''
+name_of_run = 'full_dataset_test_v02'
 
 # input dictionary
 input_datasets = {
@@ -39,6 +38,7 @@ input_datasets['schism_small'] = {
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_proj4('+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'), # NZTM
         always_xy=True),
+    'data_dt': 3600, # seconds
     'release_points_lon_lat': np.array([
         [173.786093  , -41.16104113],
         [173.8069543 , -41.15268389],
@@ -89,6 +89,7 @@ input_datasets['schism_large'] = {
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_proj4('+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'), # NZTM
         always_xy=True),
+    'data_dt': 1800, # seconds
     'release_points_lon_lat': np.array([
         [173.786093  , -41.16104113],
         [173.8069543 , -41.15268389],
@@ -140,6 +141,7 @@ input_datasets['rom'] = {
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_epsg(32619), # UTM19N
         always_xy=True),
+    'data_dt': 3600, # seconds
     'release_points_lon_lat': np.array([
         # [-78.06824664,  38.41109756], # outside domain
         # [-77.48956078,  35.87834191], # outside domain
@@ -192,11 +194,10 @@ output_step_size = 0 # in sec, 0 means no output
 
 pulse_size = np.logspace(3,5,3,dtype=int)
 
-max_model_duration = 2 # days
+max_model_duration = 1 # days
 # care:
 # -----
 # ot represents the time step as sub steps. hence only ints allowed.
-# data time_step is 1800s (30min)
 model_time_step = 60 # seconds (1 min)
 
 RK_order = 4
@@ -226,7 +227,6 @@ for pulse in pulse_size:
             },
             "base_case_params": {
                 "run_params": {
-                    "user_note": description_of_run,
                     "duration": max_model_duration*24*60*60,
                     "write_tracks": False if output_step_size==0 else True,
                 },
@@ -239,10 +239,9 @@ for pulse in pulse_size:
                     "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
                 },
                 "solver": {
-                    # "model_timestep": 1800.0,
-                    "n_sub_steps": int(1800/model_time_step),
+                    "n_sub_steps": int(input_datasets[which_dataset]['data_dt']/model_time_step),
                     "RK_order": RK_order,
-                    "screen_output_step_count": int(2*1800/model_time_step), # every hour
+                    "screen_output_step_count": int(12*input_datasets[which_dataset]['data_dt']/model_time_step), # every hour
                 },
                 "particle_release_groups": [
                     {
@@ -377,7 +376,7 @@ for pulse in pulse_size:
             outfile=os.path.join(
                 path_to_output,
                 name_of_run+'_'+which_dataset+'_' + str(pulse) + '_od',
-                'tracks.nc')
+                'tracks.nc') if output_step_size != 0 else None,
             )
 
         with open(os.path.join(
