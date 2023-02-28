@@ -4,6 +4,7 @@ import pyproj as proj
 import numpy as np
 import os
 import pickle
+import sys
 
 '''
 Here we compare the speed of OpenDrift with the speed of oceantracker03.
@@ -20,19 +21,30 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 cmd_parser = argparse.ArgumentParser(description='Run a test of the performance of OpenDrift and OceanTracker.')
 cmd_parser.add_argument('--model', type=str, default='opendrift', help='Which model to run. Options are "opendrift" and "oceantracker".')
 cmd_parser.add_argument('--dataset', type=str, default='rom', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
+cmd_parser.add_argument('--output', type=int, default=0 , help='Time step size for the output.')
+
 which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
+output_step_size = cmd_parser.parse_args().output
 
-name_of_run = 'full_dataset_test_v02'
+name_of_run = 'full_dataset_test_v03'
 
 # input dictionary
-input_datasets = {
-    'input_base_dir': os.path.abspath('C:\\Users\\laurins\\Documents\\data\\input'),
-}
+if sys.platform == 'win32':
+    input_datasets = {
+        'input_base_dir': os.path.abspath('C:\\Users\\laurins\\Documents\\data\\input'),
+    }
+elif sys.platform == 'linux':
+    input_datasets = {
+        'input_base_dir': os.path.abspath('/hpcfreenas/hindcast'),
+    }
 
 # schism small aka coarse NZ
 input_datasets['schism_small'] = {
-    'path_to_hindcast': os.path.join(input_datasets['input_base_dir'],'schism_small'),
+    'path_to_hindcast': os.path.join(
+        input_datasets['input_base_dir'],
+        'OceanNumNZ-2022-06-20/final_version/2017/01' if sys.platform == 'linux' else 'schism_small'
+        ),
     'file_mask': 'NZfinite201701*.nc',
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
@@ -83,7 +95,10 @@ input_datasets['schism_small'] = {
 
 # schism large aka marlbourough sounds
 input_datasets['schism_large'] = {
-    'path_to_hindcast': os.path.join(input_datasets['input_base_dir'],'schism_large'),
+    'path_to_hindcast': os.path.join(
+        input_datasets['input_base_dir'],
+        'MarlbroughSounds_hindcast_10years_BenPhd_2019ver/2017' if sys.platform == 'linux' else 'schism_large'
+        ),
     'file_mask': 'schism_marl201701*.nc',
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
@@ -135,8 +150,11 @@ input_datasets['schism_large'] = {
 
 # rom
 input_datasets['rom'] = {
-    'path_to_hindcast': os.path.join(input_datasets['input_base_dir'],'rom'),
-    'file_mask': 'doppio_his_2017*.nc',
+    'path_to_hindcast': os.path.join(
+        input_datasets['input_base_dir'],
+        'ROMS/doppio_bay_01' if sys.platform == 'linux' else 'rom'
+        ),
+    'file_mask': 'doppio_his_201*.nc',
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_epsg(32619), # UTM19N
@@ -186,16 +204,18 @@ input_datasets['rom'] = {
 }
 
 # output description
-path_to_output =  os.path.join('C:\\Users\\laurins\\Documents\\data\\output',name_of_run)
+path_to_output =  os.path.join(
+    'C:\\Users\\laurins\\Documents\\data\\output' if sys.platform == 'win32' else '/home/laurins/data/output',
+    name_of_run)
 os.makedirs(path_to_output, exist_ok=True)
-output_step_size = 0 # in sec, 0 means no output
+# output_step_size = 0 # in sec, 0 means no output
 
 # model description (solver, release, etc.name_of_run)
 
-pulse_size = np.logspace(3,5,3,dtype=int)
+pulse_size = np.logspace(3,6,4,dtype=int)
 
 max_model_duration = 1 # days
-# care:
+# care
 # -----
 # ot represents the time step as sub steps. hence only ints allowed.
 model_time_step = 60 # seconds (1 min)
@@ -205,6 +225,7 @@ RK_order = 4
 critical_resuspension_vel = 0
 
 for pulse in pulse_size:
+    output_file_base = f'{name_of_run}_data_{which_dataset}_particle_{pulse}_output_{output_step_size}'
 
     if which_model=='oceantracker':
         # Oceantracker
@@ -217,11 +238,11 @@ for pulse in pulse_size:
 
         params = {
             "shared_params": {
-                "output_file_base": name_of_run + '_' + which_dataset + '_' + str(pulse) + '_ot',
+                "output_file_base": f'{output_file_base}_ot',
                 "root_output_dir": path_to_output
             },
             "reader": {
-                "class_name": "oceantracker.reader.schism_reader.SCHSIMreaderNCDF" if ('schism' in which_dataset) else "oceantracker.reader.dev_ROMS_reader.ROMS",
+                "class_name": "oceantracker.reader.schism_reader.SCHSIMreaderNCDF" if ('schism' in which_dataset) else "oceantracker.reader.dev_ROMS_reader.ROMsNativeReader",
                 "input_dir": input_datasets[which_dataset]['path_to_hindcast'],
                 "file_mask": input_datasets[which_dataset]['file_mask'],
             },
@@ -241,7 +262,7 @@ for pulse in pulse_size:
                 "solver": {
                     "n_sub_steps": int(input_datasets[which_dataset]['data_dt']/model_time_step),
                     "RK_order": RK_order,
-                    "screen_output_step_count": int(12*input_datasets[which_dataset]['data_dt']/model_time_step), # every hour
+                    "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
                 },
                 "particle_release_groups": [
                     {
@@ -282,7 +303,7 @@ for pulse in pulse_size:
             plot_tracks.plot_tracks(track_data, show_grid=True,
                 plot_file_name=os.path.join(
                     path_to_output,
-                    name_of_run+'_'+which_dataset+'_' + str(pulse) + '_ot',
+                    f'{output_file_base}_ot',
                     'tracks.png'
                 )
             )
@@ -366,7 +387,7 @@ for pulse in pulse_size:
 
 
         os.makedirs(os.path.join(
-            path_to_output,name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od'),
+            path_to_output,f'{output_file_base}_od'),
             exist_ok=True
             )
 
@@ -374,28 +395,21 @@ for pulse in pulse_size:
             time_step=model_time_step,
             time_step_output=output_step_size if output_step_size != 0 else max_model_duration*24*60*60,
             outfile=os.path.join(
-                path_to_output,
-                name_of_run+'_'+which_dataset+'_' + str(pulse) + '_od',
-                'tracks.nc') if output_step_size != 0 else None,
+                path_to_output,f'{output_file_base}_od','tracks.nc') if output_step_size != 0 else None,
             )
 
-        with open(os.path.join(
-            path_to_output,
-            name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od',
-            name_of_run+'_'+which_dataset+'_' + str(pulse) +'_od'+'.pkl'), 'wb') as f:
+        with open(os.path.join(path_to_output,f'{output_file_base}_od','timing.pkl'), 'wb') as f:
             pickle.dump(o.timing, f)
 
         total_time = o.timing['total time'].total_seconds()
 
         if output_step_size != 0:
             o.plot(fast=True,filename=os.path.join(
-                path_to_output,
-                name_of_run+'_'+which_dataset+'_' + str(pulse) + '_od',
-                'tracks.png'
+                path_to_output,f'{output_file_base}_od','tracks.png'
                 )
             )
             # o.animation(fast=True,filename=os.path.join(path_to_output,name_of_run+'_'+which_dataset+'_od.mp4'))
 
     with open(os.path.join(path_to_output,name_of_run+'.txt'), 'a') as f:
-        f.write(f"{which_model},{which_dataset},{pulse},{total_time}\n")
+        f.write(f"{which_model},{which_dataset},{pulse},{output_step_size},{total_time}\n")
 

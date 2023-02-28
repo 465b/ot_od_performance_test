@@ -2,8 +2,9 @@
 
 # setting up conda
 wget -nc https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
-bash ./miniconda.sh -b -p $HOME/miniconda
+bash ./Miniconda3-latest-Linux-x86_64.sh -b -p $HOME/miniconda
 conda init bash
+
 
 # getting the source code for both models
 git clone https://github.com/oceantracker/oceantracker.git
@@ -14,7 +15,7 @@ git clone https://github.com/OpenDrift/opendrift.git
 conda create --name oceantracker python=3.10
 conda activate oceantracker
 pip install -r oceantracker/requirements.txt
-python oceantracker/setup.py develop
+pip install -e oceantracker/setup.py
 
 # creating a virtual environment for for Opendrift
 # and installing it
