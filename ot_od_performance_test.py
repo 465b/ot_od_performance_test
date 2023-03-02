@@ -27,7 +27,7 @@ which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
 output_step_size = cmd_parser.parse_args().output
 
-name_of_run = 'full_dataset_test_v03'
+name_of_run = 'full_dataset_test_v04'
 
 # input dictionary
 if sys.platform == 'win32':
@@ -152,7 +152,7 @@ input_datasets['schism_large'] = {
 input_datasets['rom'] = {
     'path_to_hindcast': os.path.join(
         input_datasets['input_base_dir'],
-        'ROMS/doppio_bay_01' if sys.platform == 'linux' else 'rom'
+        'ROMS/doppio_bay_02' if sys.platform == 'linux' else 'rom'
         ),
     'file_mask': 'doppio_his_201*.nc',
     'transformer': proj.Transformer.from_crs(
@@ -214,11 +214,11 @@ os.makedirs(path_to_output, exist_ok=True)
 
 pulse_size = np.logspace(3,6,4,dtype=int)
 
-max_model_duration = 1 # days
+max_model_duration = 10 # days
 # care
 # -----
 # ot represents the time step as sub steps. hence only ints allowed.
-model_time_step = 60 # seconds (1 min)
+model_time_step = 60*5 # seconds (5 min)
 
 RK_order = 4
 
