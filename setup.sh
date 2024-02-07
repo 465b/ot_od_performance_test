@@ -12,8 +12,8 @@ git clone https://github.com/OpenDrift/opendrift.git
 
 # creating a virtual environment for for oceantracker
 # and installing it
-conda create --name oceantracker python=3.10
-conda activate oceantracker
+conda create --name oceantracker_speedtest python=3.10
+conda activate oceantracker_speedtest
 pip install -r oceantracker/requirements.txt
 pip install -e oceantracker/setup.py
 
@@ -23,3 +23,10 @@ conda config --add channels conda-forge
 conda env create -f opendrift/environment.yml
 conda activate opendrift
 pip install --no-deps -e ./opendrift
+
+# creating a virtual environment for for oceanparcels
+# and installing it
+conda activate base
+conda install -n base conda-libmamba-solver
+conda config --set solver libmamba
+conda create -n parcels_speedtest -c conda-forge parcels cartopy jupyter

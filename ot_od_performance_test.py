@@ -11,6 +11,16 @@ Here we compare the speed of OpenDrift with the speed of oceantracker03.
 We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
+
+name_of_run = 'full_dataset_test_v06'
+
+## version 06 using commit 
+# commit b3069288b460d56810af0e50652643e8f792470b (HEAD -> dev041)
+# Author: Ross Vennell <ross.vennell@cawthron.org.nz>
+# Date:   Thu Dec 21 11:06:36 2023 +1300
+# 
+#     auto detecting gerenic netcdf format
+
 #%%
 # Preparation (def. params, model-set, etc)
 # =========================================
@@ -19,15 +29,13 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 # ----------------------------------
 
 cmd_parser = argparse.ArgumentParser(description='Run a test of the performance of OpenDrift and OceanTracker.')
-cmd_parser.add_argument('--model', type=str, default='opendrift', help='Which model to run. Options are "opendrift" and "oceantracker".')
+cmd_parser.add_argument('--model', type=str, default='oceantracker', help='Which model to run. Options are "opendrift" and "oceantracker".')
 cmd_parser.add_argument('--dataset', type=str, default='rom', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
 cmd_parser.add_argument('--output', type=int, default=0 , help='Time step size for the output.')
 
 which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
 output_step_size = cmd_parser.parse_args().output
-
-name_of_run = 'full_dataset_test_v04'
 
 # input dictionary
 if sys.platform == 'win32':
@@ -36,8 +44,90 @@ if sys.platform == 'win32':
     }
 elif sys.platform == 'linux':
     input_datasets = {
-        'input_base_dir': os.path.abspath('/hpcfreenas/hindcast'),
+        # 'input_base_dir': os.path.abspath('/hpcfreenas/hindcast'),
+        'input_base_dir': os.path.abspath('/scratch/local1'),
     }
+
+# schism small aka coarse NZ
+input_datasets['schism_estuary'] = {
+    'path_to_hindcast': os.path.join(
+        input_datasets['input_base_dir'],
+        'hzg' if sys.platform == 'linux' else 'schism_small'
+        ),
+    'file_mask': 'schout*.nc',
+    'transformer': proj.Transformer.from_crs(
+        proj.CRS.from_epsg(4326), # WGS84
+        proj.CRS.from_epsg(25832), # UTM32N
+        always_xy=True),
+    'data_dt': 3600, # seconds
+    'release_points_lon_lat': np.array([
+       [ 9.03187469, 53.86750645],
+       [ 8.77124144, 53.98610571],
+       [ 8.54838939, 53.97007844],
+       [ 9.55826941, 53.61036541],
+       [ 9.91824748, 53.54177976],
+       [ 9.91824748, 53.54177976],
+       [ 8.21109806, 53.99972419],
+       [ 9.03187469, 53.86751544],
+       [ 8.77124139, 53.9861147 ],
+       [ 8.54838929, 53.97008742],
+       [ 9.55826953, 53.6103744 ],
+       [ 9.91824767, 53.54178875],
+       [ 9.91824767, 53.54178875],
+       [ 8.21109789, 53.99973318],
+       [ 9.03188989, 53.86750644],
+       [ 8.77125669, 53.98610574],
+       [ 8.54840463, 53.97007849],
+       [ 9.55828453, 53.61036534],
+       [ 9.91826257, 53.54177965],
+       [ 9.91826257, 53.54177965],
+       [ 8.21111332, 53.99972429],
+       [ 9.03187469, 53.86750645],
+       [ 8.77124144, 53.98610571],
+       [ 8.54838939, 53.97007844],
+       [ 9.55826941, 53.61036541],
+       [ 9.91824748, 53.54177976],
+       [ 9.91824748, 53.54177976],
+       [ 8.21109806, 53.99972419],
+       [ 9.03187468, 53.86749746],
+       [ 8.77124149, 53.98609673]]),
+    'release_points_xy': np.array([
+        [502096, 5968781],
+        [485000, 5982000],
+        [470376, 5980287],
+        [536935, 5940317],
+        [560849, 5932934],
+        [560849, 5932934],
+        [448288, 5983779],
+        #
+        [502096, 5968782],
+        [485000, 5982001],
+        [470376, 5980288],
+        [536935, 5940318],
+        [560849, 5932935],
+        [560849, 5932935],
+        [448288, 5983780],
+        #
+        [502097, 5968781],
+        [485001, 5982000],
+        [470377, 5980287],
+        [536936, 5940317],
+        [560850, 5932934],
+        [560850, 5932934],
+        [448289, 5983779],
+        #
+        [502096, 5968781],
+        [485000, 5982000],
+        [470376, 5980287],
+        [536935, 5940317],
+        [560849, 5932934],
+        [560849, 5932934],
+        [448288, 5983779],
+        #
+        [502096, 5968780],
+        [485000, 5981999],
+        ])
+}
 
 # schism small aka coarse NZ
 input_datasets['schism_small'] = {
@@ -205,7 +295,8 @@ input_datasets['rom'] = {
 
 # output description
 path_to_output =  os.path.join(
-    'C:\\Users\\laurins\\Documents\\data\\output' if sys.platform == 'win32' else '/home/laurins/data/output',
+    # 'C:\\Users\\laurins\\Documents\\data\\output' if sys.platform == 'win32' else '/home/laurins/data/output',
+    'C:\\Users\\laurins\\Documents\\data\\output' if sys.platform == 'win32' else '/scratch/local1/speed_test_output',
     name_of_run)
 os.makedirs(path_to_output, exist_ok=True)
 # output_step_size = 0 # in sec, 0 means no output
@@ -213,6 +304,7 @@ os.makedirs(path_to_output, exist_ok=True)
 # model description (solver, release, etc.name_of_run)
 
 pulse_size = np.logspace(3,6,4,dtype=int)
+# pulse_size = np.logspace(3,4,2,dtype=int)
 
 max_model_duration = 10 # days
 # care
@@ -237,76 +329,69 @@ for pulse in pulse_size:
         from oceantracker.post_processing.plotting import plot_tracks
 
         params = {
-            "shared_params": {
-                "output_file_base": f'{output_file_base}_ot',
-                "root_output_dir": path_to_output
-            },
+            "output_file_base": f'{output_file_base}_ot',
+            "root_output_dir": path_to_output,
+            "max_run_duration": max_model_duration*24*60*60,
+            "time_step": model_time_step,
+            "screen_output_time_interval": 0,
+            "write_tracks": False if output_step_size==0 else True,
             "reader": {
-                "class_name": "oceantracker.reader.schism_reader.SCHSIMreaderNCDF" if ('schism' in which_dataset) else "oceantracker.reader.dev_ROMS_reader.ROMsNativeReader",
+                "class_name": "oceantracker.reader.schism_reader.SCHISMreaderNCDF" if ('schism' in which_dataset) else "oceantracker.reader.ROMS_reader.ROMsNativeReader",
                 "input_dir": input_datasets[which_dataset]['path_to_hindcast'],
                 "file_mask": input_datasets[which_dataset]['file_mask'],
             },
-            "base_case_params": {
-                "run_params": {
-                    "duration": max_model_duration*24*60*60,
-                    "write_tracks": False if output_step_size==0 else True,
-                },
-                "dispersion": {
-                    "A_H": 0.1,
-                    "A_V": 0.01
-                },
-                "tracks_writer": {
-                    "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
-                    "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
-                },
-                "solver": {
-                    "n_sub_steps": int(input_datasets[which_dataset]['data_dt']/model_time_step),
-                    "RK_order": RK_order,
-                    "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
-                },
-                "particle_release_groups": [
-                    {
-                        "points": list([list(item) for item in np.array(
-                            input_datasets[which_dataset]['transformer'].transform(
-                                input_datasets[which_dataset]['release_points_lon_lat'][:,0],
-                                input_datasets[which_dataset]['release_points_lon_lat'][:,1])
-                            ).swapaxes(0,1)]),
-                        "pulse_size": int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
-                        "release_interval": 0
-                    }
-                ],
-                "particle_properties": [],
-                "trajectory_modifiers": [
-                    {
-                        "class_name": "oceantracker.trajectory_modifiers.resuspension.BasicResuspension",
-                        "critical_friction_velocity": critical_resuspension_vel
-                    }
-                ],
-                "fields": [
-                {
-                    "class_name": "oceantracker.fields.friction_velocity.FrictionVelocity"
+            "dispersion": {
+                "A_H": 0.1,
+                "A_V": 0.01
+            },
+            "resuspension": {
+                "critical_friction_velocity": critical_resuspension_vel
+            },
+            "tracks_writer": {
+                "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
+                "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
+            },
+            # "solver": {
+            #     "RK_order": RK_order,
+            #     "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
+            # },
+            "release_groups": {
+                'default': {
+                    "points": list([list(item) for item in np.array(
+                        input_datasets[which_dataset]['transformer'].transform(
+                            input_datasets[which_dataset]['release_points_lon_lat'][:,0],
+                            input_datasets[which_dataset]['release_points_lon_lat'][:,1])
+                        ).swapaxes(0,1)]),
+                    "pulse_size": int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
+                    "release_interval": 0
                 }
-            ],
-            }
+            },
+            # "particle_properties": [],
+            # "fields": [
+            # {
+            #     "class_name": "oceantracker.fields.friction_velocity.FrictionVelocity"
+            # }
+            # ],
         }
+        
+        case_info_path = main.run(params)
 
-        runInfo = main.run(params)
-
-        caseInfoFile = load_output_files.get_case_info_file_from_run_file(runInfo[0])
-        caseInfo = json_util.read_JSON(caseInfoFile)
-        total_time = caseInfo['run_info']['model_run_duration']
+        # caseInfoFile = load_output_files.get_case_info_file_from_run_file(runInfo[0])
+        case_info = json_util.read_JSON(case_info_path)
+        total_time = case_info['run_info']['computation_duration']
+        # transform total time from '0:00:26.857793' to seconds
         total_time = total_time.split(':')
         total_time = int(total_time[0])*3600 + int(total_time[1])*60 + float(total_time[2])
         
-        if output_step_size != 0:
-            track_data = load_output_files.load_particle_track_vars(caseInfoFile, var_list=['tide', 'water_depth'])
-            plot_tracks.plot_tracks(track_data, show_grid=True,
-                plot_file_name=os.path.join(
-                    path_to_output,
-                    f'{output_file_base}_ot',
-                    'tracks.png'
-                )
-            )
+        # if output_step_size != 0:
+        #     track_data = load_output_files.load_particle_track_vars(caseInfoFile, var_list=['tide', 'water_depth'])
+        #     plot_tracks.plot_tracks(track_data, show_grid=True,
+        #         plot_file_name=os.path.join(
+        #             path_to_output,
+        #             f'{output_file_base}_ot',
+        #             'tracks.png'
+        #         )
+        #     )
             # plot_tracks.animate_particles(track_data,
             #     show_grid=True,show_dry_cells=True)
 
