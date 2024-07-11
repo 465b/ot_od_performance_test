@@ -12,7 +12,14 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'full_dataset_test_v06'
+name_of_run = 'full_dataset_test_v08'
+
+## version 07 using commit
+# commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
+# Author: Ross Vennell <ross.vennell@cawthron.org.nz>
+# Date:   Mon Feb 5 11:54:03 2024 +1300
+
+#     tidied up setting numba config via env variables, and added numba conf to case info
 
 ## version 06 using commit 
 # commit b3069288b460d56810af0e50652643e8f792470b (HEAD -> dev041)
@@ -90,7 +97,8 @@ input_datasets['schism_estuary'] = {
        [ 9.91824748, 53.54177976],
        [ 8.21109806, 53.99972419],
        [ 9.03187468, 53.86749746],
-       [ 8.77124149, 53.98609673]]),
+       [ 8.77124149, 53.98609673]
+    ]),
     'release_points_xy': np.array([
         [502096, 5968781],
         [485000, 5982000],
@@ -131,11 +139,16 @@ input_datasets['schism_estuary'] = {
 
 # schism small aka coarse NZ
 input_datasets['schism_small'] = {
+    # 'path_to_hindcast': os.path.join(
+    #     input_datasets['input_base_dir'],
+    #     'OceanNumNZ-2022-06-20/final_version/2017/01' if sys.platform == 'linux' else 'schism_small'
+    #     ),
     'path_to_hindcast': os.path.join(
         input_datasets['input_base_dir'],
-        'OceanNumNZ-2022-06-20/final_version/2017/01' if sys.platform == 'linux' else 'schism_small'
+        'schism_marlborough_sounds',
         ),
-    'file_mask': 'NZfinite201701*.nc',
+    # 'file_mask': 'NZfinite201701*.nc',
+    'file_mask': 'schism*.nc',
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_proj4('+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'), # NZTM
@@ -251,10 +264,6 @@ input_datasets['rom'] = {
         always_xy=True),
     'data_dt': 3600, # seconds
     'release_points_lon_lat': np.array([
-        # [-78.06824664,  38.41109756], # outside domain
-        # [-77.48956078,  35.87834191], # outside domain
-        # [-76.9632904 ,  39.24838291], # outside domain
-        # [-76.45835255,  35.68510219], # outside domain
         [-75.51165512,  38.31082864],
         [-74.8860462 ,  35.44369297],
         [-74.52862058,  34.2950443 ],
@@ -267,8 +276,6 @@ input_datasets['rom'] = {
         [-72.59191209,  40.63632652],
         [-72.19871125,  35.34782645],
         [-71.16154411,  36.63844384],
-        # [-71.15314662,  42.11431184],
-        # [-70.46635119,  43.52036114],
         [-70.09004307,  38.54977471],
         [-69.9444851 ,  38.71378714],
         [-69.84821837,  42.92174757],
@@ -282,7 +289,6 @@ input_datasets['rom'] = {
         [-64.79557692,  42.78925352],
         [-64.51109065,  43.15402752],
         [-64.26535265,  39.81402787],
-        # [-63.5384388 ,  44.58749064],
         [-63.43641926,  41.95324376],
         [-63.04835776,  43.70211662],
         [-62.37610229,  41.41986588],
@@ -299,34 +305,112 @@ path_to_output =  os.path.join(
     'C:\\Users\\laurins\\Documents\\data\\output' if sys.platform == 'win32' else '/scratch/local1/speed_test_output',
     name_of_run)
 os.makedirs(path_to_output, exist_ok=True)
-# output_step_size = 0 # in sec, 0 means no output
 
-# model description (solver, release, etc.name_of_run)
-
-pulse_size = np.logspace(3,6,4,dtype=int)
-# pulse_size = np.logspace(3,4,2,dtype=int)
-
+# model configuration
+pulse_size = np.logspace(1,6,6,dtype=int) 
 max_model_duration = 10 # days
-# care
-# -----
-# ot represents the time step as sub steps. hence only ints allowed.
 model_time_step = 60*5 # seconds (5 min)
-
-RK_order = 4
-
 critical_resuspension_vel = 0
 
+
+# run the model
 for pulse in pulse_size:
     output_file_base = f'{name_of_run}_data_{which_dataset}_particle_{pulse}_output_{output_step_size}'
 
-    if which_model=='oceantracker':
+    if which_model=='parcels':
+        from datetime import timedelta
+        from glob import glob
+        import xarray as xr
+
+        from parcels import (
+            AdvectionRK4,
+            FieldSet,
+            JITParticle,
+            ParticleSet,
+        )
+
+        files = glob(
+            os.path.join(
+                input_datasets['rom']['path_to_hindcast'],
+                input_datasets['rom']['file_mask']
+                )
+            )
+        files = sorted(files)
+        files = files[:1]
+
+        timestamps = np.loadtxt(
+            'timestamps_of_doppio_first_10d.txt', dtype='datetime64[s]'
+            )
+
+        fieldset = FieldSet.from_netcdf(
+        filenames = files,
+        variables = {
+            'U': 'u',
+            'V': 'v'},
+        # the dimensions here are wrong. it should be xi_u, eta_U - good enough for now
+        dimensions = {
+            'U': {'lon': 'lon_u', 'lat': 'lat_u', 'depth': 's_rho'},
+            'V': {'lon': 'lon_v', 'lat': 'lat_v', 'depth': 's_rho'},
+        },
+        timestamps = timestamps,
+        deferred_load = True,
+        time_periodic = True,
+        )
+
+        input_datasets['rom']['release_points_lon_lat'] = np.array([
+            [-74.8860462 ,  35.44369297],
+            [-74.52862058,  34.2950443 ],
+            [-74.21067673,  34.67342632],
+            [-73.95323861,  35.41533207],
+            [-73.46990185,  35.73379049],
+            [-73.18779878,  39.79203454],
+            [-72.84653146,  38.95630874],
+            [-72.63457538,  36.91732252],
+            [-72.59191209,  40.63632652],
+            [-72.19871125,  35.34782645],
+            [-71.16154411,  36.63844384],
+            [-70.09004307,  38.54977471],
+            [-69.9444851 ,  38.71378714],
+            [-69.84821837,  42.92174757],
+            [-69.80693744,  40.67720343],
+            [-68.10444023,  41.69506538],
+            [-67.62495283,  41.95124591],
+            [-64.79557692,  42.78925352],
+            [-64.51109065,  43.15402752],
+            [-64.26535265,  39.81402787],
+            [-63.43641926,  41.95324376],
+            [-63.04835776,  43.70211662],
+            [-62.37610229,  41.41986588],
+            [-61.84710945,  43.14830997],
+            [-61.12644699,  42.29980774],
+            ])
+
+        spawn_points = input_datasets['rom']['release_points_lon_lat'][np.random.choice(np.arange(len(input_datasets['rom']['release_points_lon_lat'])),size=pulse)]
+        pset = ParticleSet.from_list(
+            fieldset=fieldset,  # the fields on which the particles are advected
+            pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
+            lon=spawn_points[:,0],  # a vector of release longitudes
+            lat=spawn_points[:,1],  # a vector of release latitudes
+        )
+
+        output_file = pset.ParticleFile(
+            name=os.path.join(
+                path_to_output,f'{output_file_base}_od','tracks.zarr'),  # the file name
+            outputdt=timedelta(days=max_model_duration),  # the time step of the outputs
+        )
+        pset.execute(
+            AdvectionRK4,  # the kernel (which defines how particles move)
+            runtime=timedelta(days=max_model_duration),  # the total length of the run
+            dt=timedelta(seconds=model_time_step),  # the timestep of the kernel
+            output_file=output_file,
+)
+
+    elif which_model=='oceantracker':
         # Oceantracker
         # ------------
 
         from oceantracker import main
-        from oceantracker.post_processing.read_output_files import load_output_files 
         from oceantracker.util import json_util
-        from oceantracker.post_processing.plotting import plot_tracks
 
         params = {
             "output_file_base": f'{output_file_base}_ot',
@@ -351,10 +435,6 @@ for pulse in pulse_size:
                 "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
                 "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
             },
-            # "solver": {
-            #     "RK_order": RK_order,
-            #     "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
-            # },
             "release_groups": {
                 'default': {
                     "points": list([list(item) for item in np.array(
@@ -366,12 +446,6 @@ for pulse in pulse_size:
                     "release_interval": 0
                 }
             },
-            # "particle_properties": [],
-            # "fields": [
-            # {
-            #     "class_name": "oceantracker.fields.friction_velocity.FrictionVelocity"
-            # }
-            # ],
         }
         
         case_info_path = main.run(params)
@@ -383,21 +457,10 @@ for pulse in pulse_size:
         total_time = total_time.split(':')
         total_time = int(total_time[0])*3600 + int(total_time[1])*60 + float(total_time[2])
         
-        # if output_step_size != 0:
-        #     track_data = load_output_files.load_particle_track_vars(caseInfoFile, var_list=['tide', 'water_depth'])
-        #     plot_tracks.plot_tracks(track_data, show_grid=True,
-        #         plot_file_name=os.path.join(
-        #             path_to_output,
-        #             f'{output_file_base}_ot',
-        #             'tracks.png'
-        #         )
-        #     )
-            # plot_tracks.animate_particles(track_data,
-            #     show_grid=True,show_dry_cells=True)
 
-#%%
-# OceanDrift
-# ----------
+    #%%
+    # OceanDrift
+    # ----------
 
     if which_model == 'opendrift':
         from opendrift.readers import reader_schism_native
@@ -409,8 +472,22 @@ for pulse in pulse_size:
 
         o = SedimentDrift(loglevel=100)  # Set loglevel to 0 for debug information
 
+        if 'schism_estuary' in which_dataset:
+            reader_landmask = reader_global_landmask.Reader()
+            # NZTM proj4 string found at https://spatialreference.org/ref/epsg/nzgd2000-new-zealand-transverse-mercator-2000/
+            proj4str_nztm = '+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs'
+            schism_native = reader_schism_native.Reader(
+                filename = os.path.join(
+                    input_datasets[which_dataset]['path_to_hindcast'],
+                    input_datasets[which_dataset]['file_mask']
+                    ),
+                proj4 = proj4str_nztm,
+                use_3d = True)
+            o.add_reader([reader_landmask,schism_native])
+            o.set_config('general:use_auto_landmask', False)
+            dataset_start_time = schism_native.start_time
 
-        if 'schism' in which_dataset:
+        elif 'schism' in which_dataset:
             reader_landmask = reader_global_landmask.Reader()
             # NZTM proj4 string found at https://spatialreference.org/ref/epsg/nzgd2000-new-zealand-transverse-mercator-2000/
             proj4str_nztm = '+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'
@@ -468,7 +545,8 @@ for pulse in pulse_size:
         for point in input_datasets[which_dataset]['release_points_lon_lat']:
             o.seed_elements(lon=point[0], lat=point[1], radius=0,
                 number=int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
-                z=0,time=dataset_start_time)
+                #z=0,
+                time=dataset_start_time)
 
 
         os.makedirs(os.path.join(
@@ -487,6 +565,8 @@ for pulse in pulse_size:
             pickle.dump(o.timing, f)
 
         total_time = o.timing['total time'].total_seconds()
+
+        print(o)
 
         if output_step_size != 0:
             o.plot(fast=True,filename=os.path.join(
