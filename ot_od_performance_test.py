@@ -5,6 +5,7 @@ import numpy as np
 import os
 import pickle
 import sys
+import time
 
 '''
 Here we compare the speed of OpenDrift with the speed of oceantracker03.
@@ -12,9 +13,9 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'full_dataset_test_v08'
+name_of_run = 'tmp_debug'
 
-## version 07 using commit
+## version 07 and 8 using commit
 # commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
 # Author: Ross Vennell <ross.vennell@cawthron.org.nz>
 # Date:   Mon Feb 5 11:54:03 2024 +1300
@@ -69,86 +70,41 @@ input_datasets['schism_estuary'] = {
     'data_dt': 3600, # seconds
     'release_points_lon_lat': np.array([
        [ 9.03187469, 53.86750645],
-       [ 8.77124144, 53.98610571],
-       [ 8.54838939, 53.97007844],
        [ 9.55826941, 53.61036541],
-       [ 9.91824748, 53.54177976],
-       [ 9.91824748, 53.54177976],
        [ 8.21109806, 53.99972419],
-       [ 9.03187469, 53.86751544],
-       [ 8.77124139, 53.9861147 ],
        [ 8.54838929, 53.97008742],
-       [ 9.55826953, 53.6103744 ],
        [ 9.91824767, 53.54178875],
-       [ 9.91824767, 53.54178875],
-       [ 8.21109789, 53.99973318],
-       [ 9.03188989, 53.86750644],
        [ 8.77125669, 53.98610574],
-       [ 8.54840463, 53.97007849],
-       [ 9.55828453, 53.61036534],
        [ 9.91826257, 53.54177965],
-       [ 9.91826257, 53.54177965],
-       [ 8.21111332, 53.99972429],
        [ 9.03187469, 53.86750645],
-       [ 8.77124144, 53.98610571],
-       [ 8.54838939, 53.97007844],
        [ 9.55826941, 53.61036541],
-       [ 9.91824748, 53.54177976],
-       [ 9.91824748, 53.54177976],
        [ 8.21109806, 53.99972419],
-       [ 9.03187468, 53.86749746],
-       [ 8.77124149, 53.98609673]
     ]),
     'release_points_xy': np.array([
         [502096, 5968781],
-        [485000, 5982000],
-        [470376, 5980287],
         [536935, 5940317],
-        [560849, 5932934],
-        [560849, 5932934],
         [448288, 5983779],
         #
-        [502096, 5968782],
-        [485000, 5982001],
         [470376, 5980288],
-        [536935, 5940318],
         [560849, 5932935],
-        [560849, 5932935],
-        [448288, 5983780],
         #
-        [502097, 5968781],
         [485001, 5982000],
-        [470377, 5980287],
-        [536936, 5940317],
         [560850, 5932934],
-        [560850, 5932934],
-        [448289, 5983779],
         #
-        [502096, 5968781],
-        [485000, 5982000],
         [470376, 5980287],
-        [536935, 5940317],
         [560849, 5932934],
-        [560849, 5932934],
-        [448288, 5983779],
         #
-        [502096, 5968780],
         [485000, 5981999],
         ])
 }
 
 # schism small aka coarse NZ
 input_datasets['schism_small'] = {
-    # 'path_to_hindcast': os.path.join(
-    #     input_datasets['input_base_dir'],
-    #     'OceanNumNZ-2022-06-20/final_version/2017/01' if sys.platform == 'linux' else 'schism_small'
-    #     ),
     'path_to_hindcast': os.path.join(
         input_datasets['input_base_dir'],
-        'schism_marlborough_sounds',
+        'OceanNumNZ-2022-06-20/final_version/2017/01' if sys.platform == 'linux' else 'schism_small'
         ),
-    # 'file_mask': 'NZfinite201701*.nc',
-    'file_mask': 'schism*.nc',
+    'file_mask': 'NZfinite201701*.nc',
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_proj4('+proj=tmerc +lat_0=0 +lon_0=173 +k=0.9996 +x_0=1600000 +y_0=10000000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs'), # NZTM
@@ -264,38 +220,17 @@ input_datasets['rom'] = {
         always_xy=True),
     'data_dt': 3600, # seconds
     'release_points_lon_lat': np.array([
-        [-75.51165512,  38.31082864],
-        [-74.8860462 ,  35.44369297],
-        [-74.52862058,  34.2950443 ],
-        [-74.21067673,  34.67342632],
-        [-73.95323861,  35.41533207],
-        [-73.46990185,  35.73379049],
-        [-73.18779878,  39.79203454],
-        [-72.84653146,  38.95630874],
-        [-72.63457538,  36.91732252],
-        [-72.59191209,  40.63632652],
-        [-72.19871125,  35.34782645],
-        [-71.16154411,  36.63844384],
-        [-70.09004307,  38.54977471],
-        [-69.9444851 ,  38.71378714],
-        [-69.84821837,  42.92174757],
-        [-69.80693744,  40.67720343],
-        [-68.10444023,  41.69506538],
-        [-67.62495283,  41.95124591],
-        [-67.08252378,  38.31765205],
-        [-66.85770073,  42.88834616],
-        [-65.48411736,  42.97607939],
-        [-65.31633613,  45.24194   ],
-        [-64.79557692,  42.78925352],
-        [-64.51109065,  43.15402752],
-        [-64.26535265,  39.81402787],
-        [-63.43641926,  41.95324376],
-        [-63.04835776,  43.70211662],
-        [-62.37610229,  41.41986588],
-        [-61.84710945,  43.14830997],
-        [-61.12644699,  42.29980774],
-        [-60.99873369,  42.50516744]
-        ])
+            [-74.8860462 ,  35.44369297],
+            [-74.21067673,  34.67342632],
+            [-72.84653146,  38.95630874],
+            [-72.59191209,  40.63632652],
+            [-71.16154411,  36.63844384],
+            [-69.9444851 ,  38.71378714],
+            [-69.80693744,  40.67720343],
+            [-64.51109065,  43.15402752],
+            [-63.43641926,  41.95324376],
+            [-62.37610229,  41.41986588],
+            ])
 
 }
 
@@ -312,8 +247,6 @@ max_model_duration = 10 # days
 model_time_step = 60*5 # seconds (5 min)
 critical_resuspension_vel = 0
 
-
-# run the model
 for pulse in pulse_size:
     output_file_base = f'{name_of_run}_data_{which_dataset}_particle_{pulse}_output_{output_step_size}'
 
@@ -341,49 +274,29 @@ for pulse in pulse_size:
         timestamps = np.loadtxt(
             'timestamps_of_doppio_first_10d.txt', dtype='datetime64[s]'
             )
+        timestamps = np.array([timestamps,])
+
+        start_time = time.time()
 
         fieldset = FieldSet.from_netcdf(
         filenames = files,
         variables = {
             'U': 'u',
             'V': 'v'},
-        # the dimensions here are wrong. it should be xi_u, eta_U - good enough for now
+        # the dimensions here are wrong. it should be xi0 nodes and _u, eta_U - good enough for now
         dimensions = {
             'U': {'lon': 'lon_u', 'lat': 'lat_u', 'depth': 's_rho'},
             'V': {'lon': 'lon_v', 'lat': 'lat_v', 'depth': 's_rho'},
         },
         timestamps = timestamps,
         deferred_load = True,
-        time_periodic = True,
+        # parcels has an issue with overlapping data sets 
+        # i.e. if element 0 ends at midnight and element 1 starts
+        # at midnight.
+        # to avoid rewritting the netCDF I loop as we
+        # assume neglicable read/write times anyway
+        time_periodic = timedelta(hours=24),
         )
-
-        input_datasets['rom']['release_points_lon_lat'] = np.array([
-            [-74.8860462 ,  35.44369297],
-            [-74.52862058,  34.2950443 ],
-            [-74.21067673,  34.67342632],
-            [-73.95323861,  35.41533207],
-            [-73.46990185,  35.73379049],
-            [-73.18779878,  39.79203454],
-            [-72.84653146,  38.95630874],
-            [-72.63457538,  36.91732252],
-            [-72.59191209,  40.63632652],
-            [-72.19871125,  35.34782645],
-            [-71.16154411,  36.63844384],
-            [-70.09004307,  38.54977471],
-            [-69.9444851 ,  38.71378714],
-            [-69.84821837,  42.92174757],
-            [-69.80693744,  40.67720343],
-            [-68.10444023,  41.69506538],
-            [-67.62495283,  41.95124591],
-            [-64.79557692,  42.78925352],
-            [-64.51109065,  43.15402752],
-            [-64.26535265,  39.81402787],
-            [-63.43641926,  41.95324376],
-            [-63.04835776,  43.70211662],
-            [-62.37610229,  41.41986588],
-            [-61.84710945,  43.14830997],
-            [-61.12644699,  42.29980774],
-            ])
 
         spawn_points = input_datasets['rom']['release_points_lon_lat'][np.random.choice(np.arange(len(input_datasets['rom']['release_points_lon_lat'])),size=pulse)]
         pset = ParticleSet.from_list(
@@ -403,14 +316,19 @@ for pulse in pulse_size:
             runtime=timedelta(days=max_model_duration),  # the total length of the run
             dt=timedelta(seconds=model_time_step),  # the timestep of the kernel
             output_file=output_file,
-)
+        )
+
+        end_time = time.time()
+        total_time = end_time - start_time
 
     elif which_model=='oceantracker':
         # Oceantracker
         # ------------
 
         from oceantracker import main
+        from oceantracker.post_processing.read_output_files import load_output_files 
         from oceantracker.util import json_util
+        from oceantracker.post_processing.plotting import plot_tracks
 
         params = {
             "output_file_base": f'{output_file_base}_ot',
@@ -435,6 +353,10 @@ for pulse in pulse_size:
                 "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
                 "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
             },
+            # "solver": {
+            #     "RK_order": RK_order,
+            #     "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
+            # },
             "release_groups": {
                 'default': {
                     "points": list([list(item) for item in np.array(
@@ -446,6 +368,12 @@ for pulse in pulse_size:
                     "release_interval": 0
                 }
             },
+            # "particle_properties": [],
+            # "fields": [
+            # {
+            #     "class_name": "oceantracker.fields.friction_velocity.FrictionVelocity"
+            # }
+            # ],
         }
         
         case_info_path = main.run(params)
@@ -513,13 +441,8 @@ for pulse in pulse_size:
 
         # prevent opendrift from making a new dynamical landmask with global_landmask
         
-        if RK_order == 4:
-            o.set_config('drift:advection_scheme', 'runge-kutta4')
-        elif RK_order == 1:
-            o.set_config('drift:advection_scheme', 'euler')
-        else:
-            print('Error: RK_order must be 1 or 4')
-            break   
+        # solver rk4
+        o.set_config('drift:advection_scheme', 'runge-kutta4')
         
         # stokes drift
         o.set_config('drift:stokes_drift', False)
@@ -561,19 +484,10 @@ for pulse in pulse_size:
                 path_to_output,f'{output_file_base}_od','tracks.nc') if output_step_size != 0 else None,
             )
 
-        with open(os.path.join(path_to_output,f'{output_file_base}_od','timing.pkl'), 'wb') as f:
-            pickle.dump(o.timing, f)
+        # with open(os.path.join(path_to_output,f'{output_file_base}_od','timing.pkl'), 'wb') as f:
+        #     pickle.dump(o.timing, f)
 
         total_time = o.timing['total time'].total_seconds()
-
-        print(o)
-
-        if output_step_size != 0:
-            o.plot(fast=True,filename=os.path.join(
-                path_to_output,f'{output_file_base}_od','tracks.png'
-                )
-            )
-            # o.animation(fast=True,filename=os.path.join(path_to_output,name_of_run+'_'+which_dataset+'_od.mp4'))
 
     with open(os.path.join(path_to_output,name_of_run+'.txt'), 'a') as f:
         f.write(f"{which_model},{which_dataset},{pulse},{output_step_size},{total_time}\n")
