@@ -13,7 +13,7 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'tmp_debug'
+name_of_run = 'testing_nemo_reader'
 
 ## version 07 and 8 using commit
 # commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
@@ -38,7 +38,7 @@ name_of_run = 'tmp_debug'
 
 cmd_parser = argparse.ArgumentParser(description='Run a test of the performance of OpenDrift and OceanTracker.')
 cmd_parser.add_argument('--model', type=str, default='oceantracker', help='Which model to run. Options are "opendrift" and "oceantracker".')
-cmd_parser.add_argument('--dataset', type=str, default='rom', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
+cmd_parser.add_argument('--dataset', type=str, default='nemo', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
 cmd_parser.add_argument('--output', type=int, default=0 , help='Time step size for the output.')
 
 which_model = cmd_parser.parse_args().model
@@ -63,6 +63,7 @@ input_datasets['schism_estuary'] = {
         'hzg' if sys.platform == 'linux' else 'schism_small'
         ),
     'file_mask': 'schout*.nc',
+    'oceantracker_reader': "SCHISMreaderNCDF",
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_epsg(25832), # UTM32N
@@ -214,6 +215,7 @@ input_datasets['rom'] = {
         'ROMS/doppio_bay_02' if sys.platform == 'linux' else 'rom'
         ),
     'file_mask': 'doppio_his_201*.nc',
+    'oceantracker_reader': "ROMS_reader",
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_epsg(32619), # UTM19N
@@ -231,7 +233,51 @@ input_datasets['rom'] = {
             [-63.43641926,  41.95324376],
             [-62.37610229,  41.41986588],
             ])
+}
 
+# nemo
+input_datasets['nemo'] = {
+    'path_to_hindcast': os.path.join(
+        input_datasets['input_base_dir'],
+        'NEMO/baltic'
+        ),
+    'file_mask': '*.nc',
+    'oceantracker_reader': "GLORYSreader",
+    'transformer': proj.Transformer.from_crs(
+        proj.CRS.from_epsg(4326), # WGS84
+        proj.CRS.from_epsg(25833), # UTM33N
+        always_xy=True),
+    'data_dt': 3600, # ,
+    'release_points_lon_lat': np.array([
+       [26.24914652, 53.62084284],
+       [11.74138304, 57.59627221],
+       [ 9.88378601, 59.12949598],
+       [30.07541881, 65.19897143],
+       [29.32377253, 62.96581345],
+       [26.87092123, 58.95689007],
+       [12.9142767, 60.57033272 ],
+       [20.37102819, 64.97765214],
+       [16.58614791, 54.51054369],
+       [24.33259039, 55.17697955],
+    #    [28.98996948, 64.28547982],
+    #    [10.10919548, 61.32635904],
+    #    [24.19031533, 54.1708471 ],
+    #    [26.40140448, 61.32829611],
+    #    [25.54562022, 53.65127282],
+    #    [14.40421594, 65.31829057],
+    #    [ 9.2518973, 59.43119579 ],
+    #    [12.30778475, 65.0992816 ],
+    #    [20.31473819, 65.07813115],
+    #    [22.50382744, 60.61403735],
+    #    [10.3043585, 54.0901189  ],
+    #    [ 9.51512965, 59.50471693],
+    #    [26.93017637, 57.00587859],
+    #    [16.01582867, 64.98688646],
+    #    [21.9730505, 53.04142688 ],
+    #    [13.03814926, 60.22205362],
+    #    [21.25043432, 62.89193372],
+    #    [12.0119608, 53.26718728 ],
+       ])
 }
 
 # output description
@@ -253,12 +299,14 @@ for pulse in pulse_size:
     if which_model=='parcels':
         from datetime import timedelta
         from glob import glob
-        import xarray as xr
+        # import xarray as xr
 
         from parcels import (
             AdvectionRK4,
+            AdvectionRK4_3D,
             FieldSet,
             JITParticle,
+            ScipyParticle,
             ParticleSet,
         )
 
@@ -282,11 +330,28 @@ for pulse in pulse_size:
         filenames = files,
         variables = {
             'U': 'u',
-            'V': 'v'},
-        # the dimensions here are wrong. it should be xi0 nodes and _u, eta_U - good enough for now
+            'V': 'v',
+            # 'W': 'w',
+            },
         dimensions = {
-            'U': {'lon': 'lon_u', 'lat': 'lat_u', 'depth': 's_rho'},
-            'V': {'lon': 'lon_v', 'lat': 'lat_v', 'depth': 's_rho'},
+            'U': {
+                'lon': 'lon_u',
+                'lat': 'lat_u',
+                'depth': 's_rho',
+                'time': 'ocean_time'
+                },
+            'V': {
+                'lon': 'lon_v',
+                'lat': 'lat_v',
+                'depth': 's_rho',
+                'time': 'ocean_time'
+                },
+            # 'W': {
+            #     'lon': 'lon_rho',
+            #     'lat': 'lat_rho',
+            #     'depth': 's_w',
+            #     'time': 'ocean_time'
+            #     },
         },
         timestamps = timestamps,
         deferred_load = True,
@@ -326,9 +391,8 @@ for pulse in pulse_size:
         # ------------
 
         from oceantracker import main
-        from oceantracker.post_processing.read_output_files import load_output_files 
+        from read_oceantracker.python.load_output_files import load_track_data
         from oceantracker.util import json_util
-        from oceantracker.post_processing.plotting import plot_tracks
 
         params = {
             "output_file_base": f'{output_file_base}_ot',
@@ -338,7 +402,7 @@ for pulse in pulse_size:
             "screen_output_time_interval": 0,
             "write_tracks": False if output_step_size==0 else True,
             "reader": {
-                "class_name": "oceantracker.reader.schism_reader.SCHISMreaderNCDF" if ('schism' in which_dataset) else "oceantracker.reader.ROMS_reader.ROMsNativeReader",
+                "class_name": input_datasets[which_dataset]['oceantracker_reader'],
                 "input_dir": input_datasets[which_dataset]['path_to_hindcast'],
                 "file_mask": input_datasets[which_dataset]['file_mask'],
             },
@@ -357,17 +421,19 @@ for pulse in pulse_size:
             #     "RK_order": RK_order,
             #     "screen_output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
             # },
-            "release_groups": {
-                'default': {
-                    "points": list([list(item) for item in np.array(
-                        input_datasets[which_dataset]['transformer'].transform(
-                            input_datasets[which_dataset]['release_points_lon_lat'][:,0],
-                            input_datasets[which_dataset]['release_points_lon_lat'][:,1])
-                        ).swapaxes(0,1)]),
-                    "pulse_size": int(pulse/len(input_datasets[which_dataset]['release_points_lon_lat'])),
+            "release_groups": [
+                {
+                    "name": "default",
+                    # "points": list([list(item) for item in np.array(
+                    #     input_datasets[which_dataset]['transformer'].transform(
+                    #         input_datasets[which_dataset]['release_points_lon_lat'][:,0],
+                    #         input_datasets[which_dataset]['release_points_lon_lat'][:,1])
+                    #     ).swapaxes(0,1)]),
+                    "points": input_datasets[which_dataset]['release_points_lon_lat'],
+                    "pulse_size": int(max(pulse/len(input_datasets[which_dataset]['release_points_lon_lat']),1)),
                     "release_interval": 0
                 }
-            },
+            ],
             # "particle_properties": [],
             # "fields": [
             # {
