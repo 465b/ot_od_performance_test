@@ -1,4 +1,3 @@
-#%%
 import argparse
 import pyproj as proj
 import numpy as np
@@ -13,7 +12,7 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'testing_nemo_reader'
+name_of_run = 'OT_parcels_comparison_on_nemo_without_output_extra_large'
 
 ## version 07 and 8 using commit
 # commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
@@ -29,15 +28,13 @@ name_of_run = 'testing_nemo_reader'
 # 
 #     auto detecting gerenic netcdf format
 
-#%%
 # Preparation (def. params, model-set, etc)
 # =========================================
-#%%
 # Parameterisation (for both models)
 # ----------------------------------
 
 cmd_parser = argparse.ArgumentParser(description='Run a test of the performance of OpenDrift and OceanTracker.')
-cmd_parser.add_argument('--model', type=str, default='oceantracker', help='Which model to run. Options are "opendrift" and "oceantracker".')
+cmd_parser.add_argument('--model', type=str, default='parcels', help='Which model to run. Options are "opendrift" and "oceantracker".')
 cmd_parser.add_argument('--dataset', type=str, default='nemo', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
 cmd_parser.add_argument('--output', type=int, default=0 , help='Time step size for the output.')
 
@@ -279,6 +276,7 @@ input_datasets['nemo'] = {
     #    [12.0119608, 53.26718728 ],
        ])
 }
+# input_datasets['nemo']['release_points_lat_lon'] = input_datasets['nemo']['release_points_lon_lat'][:, [1, 0]]
 
 # output description
 path_to_output =  os.path.join(
@@ -293,7 +291,9 @@ max_model_duration = 10 # days
 model_time_step = 60*5 # seconds (5 min)
 critical_resuspension_vel = 0
 
-for pulse in pulse_size:
+
+for pulse in [10_000_000]: #pulse_size:
+
     output_file_base = f'{name_of_run}_data_{which_dataset}_particle_{pulse}_output_{output_step_size}'
 
     if which_model=='parcels':
@@ -310,79 +310,142 @@ for pulse in pulse_size:
             ParticleSet,
         )
 
-        files = glob(
-            os.path.join(
-                input_datasets['rom']['path_to_hindcast'],
-                input_datasets['rom']['file_mask']
+        start_time = time.time()        
+
+        if which_dataset == "nemo":
+       
+            uvw_files = sorted(glob(os.path.join(input_datasets['nemo']['path_to_hindcast'],'*PHY*.nc')))
+            mesh_mask = glob(os.path.join(input_datasets['nemo']['path_to_hindcast'],'*coordinates.nc'))
+            
+            filenames = {
+                "U": {"lon": uvw_files[0],
+                    "lat": uvw_files[0],
+                    "depth": uvw_files[0],
+                    "data": uvw_files
+                    },
+                "V": {"lon": uvw_files[0],
+                    "lat": uvw_files[0],
+                    "depth": uvw_files[0],
+                    "data": uvw_files
+                    },
+                "W": {"lon": uvw_files[0],
+                    "lat": uvw_files[0],
+                    "depth": uvw_files[0],
+                    "data": uvw_files
+                    }
+            }
+            variables = {
+                "U": "uo",
+                "V": "vo",
+                "W": "wo",
+            }
+
+            c_grid_dimensions = {
+                "lon": "lon",
+                "lat": "lat",
+                "depth": "depth",
+                "time": "time",
+            }
+
+            dimensions = {
+                "U": c_grid_dimensions,
+                "V": c_grid_dimensions,
+                "W": c_grid_dimensions,
+            }
+
+            fieldset = FieldSet.from_nemo(filenames, variables, dimensions)
+
+
+            release_count_multiplier = int(max(pulse/len(input_datasets[which_dataset]['release_points_lon_lat']),1))
+            
+            pset = ParticleSet(fieldset, JITParticle,
+                            lat=np.repeat(input_datasets['nemo']['release_points_lon_lat'][:,1],release_count_multiplier),
+                            lon=np.repeat(input_datasets['nemo']['release_points_lon_lat'][:,0],release_count_multiplier),
+                            depth=[1]*len(input_datasets['nemo']['release_points_lon_lat'][:,0])*release_count_multiplier
+                            )
+
+        elif which_dataset == "rom":
+            files = glob(
+                os.path.join(
+                    input_datasets['rom']['path_to_hindcast'],
+                    input_datasets['rom']['file_mask']
+                    )
                 )
-            )
-        files = sorted(files)
-        files = files[:1]
+            files = sorted(files)
+            files = files[:1]
 
-        timestamps = np.loadtxt(
-            'timestamps_of_doppio_first_10d.txt', dtype='datetime64[s]'
-            )
-        timestamps = np.array([timestamps,])
+            timestamps = np.loadtxt(
+                'timestamps_of_doppio_first_10d.txt', dtype='datetime64[s]'
+                )
+            timestamps = np.array([timestamps,])
 
-        start_time = time.time()
+            start_time = time.time()
 
-        fieldset = FieldSet.from_netcdf(
-        filenames = files,
-        variables = {
-            'U': 'u',
-            'V': 'v',
-            # 'W': 'w',
+            fieldset = FieldSet.from_netcdf(
+            filenames = files,
+            variables = {
+                'U': 'u',
+                'V': 'v',
+                # 'W': 'w',
+                },
+            dimensions = {
+                'U': {
+                    'lon': 'lon_u',
+                    'lat': 'lat_u',
+                    'depth': 's_rho',
+                    'time': 'ocean_time'
+                    },
+                'V': {
+                    'lon': 'lon_v',
+                    'lat': 'lat_v',
+                    'depth': 's_rho',
+                    'time': 'ocean_time'
+                    },
+                # 'W': {
+                #     'lon': 'lon_rho',
+                #     'lat': 'lat_rho',
+                #     'depth': 's_w',
+                #     'time': 'ocean_time'
+                #     },
             },
-        dimensions = {
-            'U': {
-                'lon': 'lon_u',
-                'lat': 'lat_u',
-                'depth': 's_rho',
-                'time': 'ocean_time'
-                },
-            'V': {
-                'lon': 'lon_v',
-                'lat': 'lat_v',
-                'depth': 's_rho',
-                'time': 'ocean_time'
-                },
-            # 'W': {
-            #     'lon': 'lon_rho',
-            #     'lat': 'lat_rho',
-            #     'depth': 's_w',
-            #     'time': 'ocean_time'
-            #     },
-        },
-        timestamps = timestamps,
-        deferred_load = True,
-        # parcels has an issue with overlapping data sets 
-        # i.e. if element 0 ends at midnight and element 1 starts
-        # at midnight.
-        # to avoid rewritting the netCDF I loop as we
-        # assume neglicable read/write times anyway
-        time_periodic = timedelta(hours=24),
-        )
+            timestamps = timestamps,
+            deferred_load = True,
+            # parcels has an issue with overlapping data sets 
+            # i.e. if element 0 ends at midnight and element 1 starts
+            # at midnight.
+            # to avoid rewritting the netCDF I loop as we
+            # assume neglicable read/write times anyway
+            time_periodic = timedelta(hours=24),
+            )
 
-        spawn_points = input_datasets['rom']['release_points_lon_lat'][np.random.choice(np.arange(len(input_datasets['rom']['release_points_lon_lat'])),size=pulse)]
-        pset = ParticleSet.from_list(
-            fieldset=fieldset,  # the fields on which the particles are advected
-            pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
-            lon=spawn_points[:,0],  # a vector of release longitudes
-            lat=spawn_points[:,1],  # a vector of release latitudes
-        )
+            spawn_points = input_datasets['rom']['release_points_lon_lat'][np.random.choice(np.arange(len(input_datasets['rom']['release_points_lon_lat'])),size=pulse)]
+            set = ParticleSet.from_list(
+                fieldset=fieldset,  # the fields on which the particles are advected
+                pclass=JITParticle,  # the type of particles (JITParticle or ScipyParticle)
+                lon=spawn_points[:,0],  # a vector of release longitudes
+                lat=spawn_points[:,1],  # a vector of release latitudes
+            )
 
-        output_file = pset.ParticleFile(
-            name=os.path.join(
-                path_to_output,f'{output_file_base}_od','tracks.zarr'),  # the file name
-            outputdt=timedelta(days=max_model_duration),  # the time step of the outputs
-        )
-        pset.execute(
-            AdvectionRK4,  # the kernel (which defines how particles move)
-            runtime=timedelta(days=max_model_duration),  # the total length of the run
-            dt=timedelta(seconds=model_time_step),  # the timestep of the kernel
-            output_file=output_file,
-        )
+        if output_step_size != 0:
+            output_file = pset.ParticleFile(
+                name=os.path.join(
+                    path_to_output,f'{output_file_base}','tracks.zarr'),  # the file name
+                    outputdt=timedelta(seconds=model_time_step*output_step_size),  # the time step of the outputs
+            )
+            pset.execute(
+                AdvectionRK4_3D,  # the kernel (which defines how particles move)
+                runtime=timedelta(days=max_model_duration),  # the total length of the run
+                dt=timedelta(seconds=model_time_step),  # the timestep of the kernel
+                output_file=output_file,
+            )
 
+        else:
+            pset.execute(
+                AdvectionRK4_3D,  # the kernel (which defines how particles move)
+                runtime=timedelta(days=max_model_duration),  # the total length of the run
+                dt=timedelta(seconds=model_time_step),  # the timestep of the kernel
+            )
+        
         end_time = time.time()
         total_time = end_time - start_time
 
@@ -397,14 +460,15 @@ for pulse in pulse_size:
         params = {
             "output_file_base": f'{output_file_base}_ot',
             "root_output_dir": path_to_output,
+            "screen_output_time_interval": 1e9,
             "max_run_duration": max_model_duration*24*60*60,
             "time_step": model_time_step,
-            "screen_output_time_interval": 0,
             "write_tracks": False if output_step_size==0 else True,
             "reader": {
                 "class_name": input_datasets[which_dataset]['oceantracker_reader'],
                 "input_dir": input_datasets[which_dataset]['path_to_hindcast'],
                 "file_mask": input_datasets[which_dataset]['file_mask'],
+                "time_buffer_size": 6,
             },
             "dispersion": {
                 "A_H": 0.1,
@@ -413,9 +477,12 @@ for pulse in pulse_size:
             "resuspension": {
                 "critical_friction_velocity": critical_resuspension_vel
             },
+            # "tracks_writer": {
+            #     "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
+            #     "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
+            # },
             "tracks_writer": {
-                "class_name": "oceantracker.tracks_writer.track_writer_compact.FlatTrackWriter",
-                "output_step_count": int(output_step_size/model_time_step) if output_step_size!=0 else 1
+                "update_interval": model_time_step*output_step_size if output_step_size != 0 else 1
             },
             # "solver": {
             #     "RK_order": RK_order,
@@ -441,6 +508,11 @@ for pulse in pulse_size:
             # }
             # ],
         }
+
+        # drop dispersion if the model is nemo
+        if which_dataset == 'nemo':
+            params['dispersion'] == 0
+
         
         case_info_path = main.run(params)
 
@@ -452,7 +524,6 @@ for pulse in pulse_size:
         total_time = int(total_time[0])*3600 + int(total_time[1])*60 + float(total_time[2])
         
 
-    #%%
     # OceanDrift
     # ----------
 
