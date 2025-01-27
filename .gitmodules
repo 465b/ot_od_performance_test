@@ -1,0 +1,3 @@
+[submodule "oceantracker"]
+	path = oceantracker
+	url = git@github.com:oceantracker/oceantracker.git
