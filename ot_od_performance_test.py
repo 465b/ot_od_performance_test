@@ -12,7 +12,7 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'OT_parcels_comparison_on_nemo_without_output_extra_large'
+name_of_run = 'OT_dev050_with_SVML_enabled'
 
 ## version 07 and 8 using commit
 # commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
