@@ -6,6 +6,13 @@ import pickle
 import sys
 import time
 
+# os.environ['NUMBA_NUM_THREADS'] = '6'  # Set before importing numba
+# os.environ['NUMBA_DEBUG_PRINT_AFTER_TRANSFORM'] = '1'
+# os.environ['NUMBA_DUMP_IR'] = '1'
+# os.environ['NUMBA_DEBUG'] = '1'
+# os.environ['NUMBA_DUMP_OPTIMIZED'] = '1'
+# os.environ['NUMBA_PARALLEL_DIAGNOSTICS'] = '4'
+
 '''
 Here we compare the speed of OpenDrift with the speed of oceantracker03.
 We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
@@ -34,13 +41,15 @@ name_of_run = 'OT_dev050_with_SVML_enabled'
 # ----------------------------------
 
 cmd_parser = argparse.ArgumentParser(description='Run a test of the performance of OpenDrift and OceanTracker.')
-cmd_parser.add_argument('--model', type=str, default='parcels', help='Which model to run. Options are "opendrift" and "oceantracker".')
-cmd_parser.add_argument('--dataset', type=str, default='nemo', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
+cmd_parser.add_argument('--model', type=str, default='oceantracker', help='Which model to run. Options are "opendrift" and "oceantracker".')
+cmd_parser.add_argument('--dataset', type=str, default='schism_estuary', help='Which dataset to run. Options are "schism_small","schism_large" and "rom".')
 cmd_parser.add_argument('--output', type=int, default=0 , help='Time step size for the output.')
+cmd_parser.add_argument('--processors', type=int, default=1, help='Number of processors to use for the model run.')
 
 which_model = cmd_parser.parse_args().model
 which_dataset = cmd_parser.parse_args().dataset
 output_step_size = cmd_parser.parse_args().output
+processors = cmd_parser.parse_args().processors
 
 # input dictionary
 if sys.platform == 'win32':
@@ -50,17 +59,17 @@ if sys.platform == 'win32':
 elif sys.platform == 'linux':
     input_datasets = {
         # 'input_base_dir': os.path.abspath('/hpcfreenas/hindcast'),
-        'input_base_dir': os.path.abspath('/scratch/local1'),
+        'input_base_dir': os.path.abspath('/scratch/local1/hydrodynamics_hindcasts'),
     }
 
 # schism small aka coarse NZ
 input_datasets['schism_estuary'] = {
     'path_to_hindcast': os.path.join(
         input_datasets['input_base_dir'],
-        'hzg' if sys.platform == 'linux' else 'schism_small'
+        'hzg'
         ),
     'file_mask': 'schout*.nc',
-    'oceantracker_reader': "SCHISMreaderNCDF",
+    'oceantracker_reader': "SCHISMreader",
     'transformer': proj.Transformer.from_crs(
         proj.CRS.from_epsg(4326), # WGS84
         proj.CRS.from_epsg(25832), # UTM32N
@@ -286,13 +295,13 @@ path_to_output =  os.path.join(
 os.makedirs(path_to_output, exist_ok=True)
 
 # model configuration
-pulse_size = np.logspace(1,6,6,dtype=int) 
+pulse_size = np.logspace(1,7,7,dtype=int) 
 max_model_duration = 10 # days
 model_time_step = 60*5 # seconds (5 min)
 critical_resuspension_vel = 0
 
 
-for pulse in [10_000_000]: #pulse_size:
+for pulse in pulse_size:
 
     output_file_base = f'{name_of_run}_data_{which_dataset}_particle_{pulse}_output_{output_step_size}'
 
@@ -458,6 +467,8 @@ for pulse in [10_000_000]: #pulse_size:
         from oceantracker.util import json_util
 
         params = {
+            # "use_parallel_threads" : True,
+            "processors": processors,
             "output_file_base": f'{output_file_base}_ot',
             "root_output_dir": path_to_output,
             "screen_output_time_interval": 1e9,
@@ -468,7 +479,6 @@ for pulse in [10_000_000]: #pulse_size:
                 "class_name": input_datasets[which_dataset]['oceantracker_reader'],
                 "input_dir": input_datasets[which_dataset]['path_to_hindcast'],
                 "file_mask": input_datasets[which_dataset]['file_mask'],
-                "time_buffer_size": 6,
             },
             "dispersion": {
                 "A_H": 0.1,
@@ -496,8 +506,8 @@ for pulse in [10_000_000]: #pulse_size:
                     #         input_datasets[which_dataset]['release_points_lon_lat'][:,0],
                     #         input_datasets[which_dataset]['release_points_lon_lat'][:,1])
                     #     ).swapaxes(0,1)]),
-                    "points": input_datasets[which_dataset]['release_points_lon_lat'],
-                    "pulse_size": int(max(pulse/len(input_datasets[which_dataset]['release_points_lon_lat']),1)),
+                    "points": input_datasets[which_dataset]['release_points_xy'],
+                    "pulse_size": int(max(pulse/len(input_datasets[which_dataset]['release_points_xy']),1)),
                     "release_interval": 0
                 }
             ],
