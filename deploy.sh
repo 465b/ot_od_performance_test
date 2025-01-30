@@ -25,15 +25,15 @@ source ~/.bashrc
 # python ot_od_performance_test.py --model opendrift --dataset schism_small
 # python ot_od_performance_test.py --model opendrift --dataset schism_large
 # python ot_od_performance_test.py --model parcels --dataset rom
-/home/zmaw/u301513/.conda/envs/parcels/bin/python ot_od_performance_test.py --model parcels --dataset nemo --output 0
+# /home/zmaw/u301513/.conda/envs/parcels/bin/python ot_od_performance_test.py --model parcels --dataset nemo --output 0
 # conda deactivate
 
 # conda activate oceantracker_speedtest
 # python ot_od_performance_test.py --model oceantracker --dataset schism_small
 # python ot_od_performance_test.py --model oceantracker --dataset schism_large
 # python ot_od_performance_test.py --model oceantracker --dataset rom
-# python ot_od_performance_test.py --model oceantracker --dataset schism_estuary
-/home/zmaw/u301513/.conda/envs/oceantracker_speedtest/bin/python ot_od_performance_test.py --model oceantracker --dataset nemo --output 0
+python ot_od_performance_test.py --model oceantracker --dataset schism_estuary
+# /home/zmaw/u301513/.conda/envs/oceantracker_speedtest/bin/python ot_od_performance_test.py --model oceantracker --dataset nemo --output 0
 # conda deactivate
 
 # conda activate opendrift

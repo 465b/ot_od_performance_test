@@ -19,7 +19,15 @@ We test it on a SCHISM (unstruct) hindcast in Marlborough Sounds.
 '''
 
 
-name_of_run = 'OT_dev050_with_SVML_enabled'
+name_of_run = 'OT_dev041_ea2432af5c7a42fcfbbc4cfd54834d6af435f228_with_SVML'
+
+# v09 of the model comparison ran with commit 
+# commit ed6bb53d3ea1700f1aae5d391a1d26898c4a5fd6 (HEAD -> hotfix-segfault-in-tide-interpolation, origin/hotfix-segfault-in-tide-interpolation)
+# Author: laurin steidle <laurin.steidle@uni-hamburg.de>
+# Date:   Thu Oct 17 17:32:14 2024 +0200
+
+#     fixed segfault in tidal interpolation
+
 
 ## version 07 and 8 using commit
 # commit e2f2929c01d1f627483658a868b3eca7e4c14b17 (HEAD -> dev041, origin/dev041)
